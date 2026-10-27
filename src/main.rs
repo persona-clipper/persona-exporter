@@ -11,8 +11,8 @@ async fn main(spawner: embassy_executor::Spawner) {
 
 #[cfg(not(target_os = "none"))]
 use mimalloc::MiMalloc;
-use persona_exporter::config::{MainCliArguments, SendModel};
-use persona_exporter::platforms::os::methods::{create_metrics_struct_by_config, initial_tracing, load_config};
+use persona_exporter::config::{AgentConfigFile, MainCliArguments, SendModel};
+use persona_exporter::platforms::os::methods::{create_metrics_struct_by_config, initial_tracing};
 use tracing::info;
 use persona_exporter::platforms::os::methods::arguments::GlobalContext;
 use persona_exporter::platforms::os::methods::metrics::processes::get_sort_closure;
@@ -22,7 +22,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 fn main() {
     let args: MainCliArguments = argh::from_env();
 
-    let config = match load_config(args.config_path) {
+    let config = match AgentConfigFile::new(args.config_path) {
         Ok(config) => {
             if args.config_test {
                 println!("OK");

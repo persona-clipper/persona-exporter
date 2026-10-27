@@ -1,10 +1,10 @@
 use crate::config::ProcessSortBy;
 use persona_exporter_types::metrics::processes::ProcessListInfo;
-use persona_exporter_types::metrics::{structs::processes::ProcessInfo, system::SystemInfo};
+use persona_exporter_types::metrics::traits::Clear;
+use persona_exporter_types::metrics::structs::processes::ProcessInfo;
 use persona_exporter_types::metrics::sysinfo::processes::FromWithNormalizeCpu;
 use std::cmp::Ordering;
-use std::process;
-use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
+use sysinfo::{Pid, ProcessRefreshKind, System, get_current_pid};
 
 #[must_use]
 pub fn get_process_by_id(sys: &System, pid: Pid) -> Option<ProcessInfo> {
@@ -90,19 +90,42 @@ pub fn update_process_list_info(
     // };
 }
 
-pub fn try_collect_process_list_metrics(
+/// TODO:
+/// Optimize too many arguments in one function
+/// Solution:
+/// Move the arguments for this function into a separate structure
+pub fn try_collect_process_list_metrics<'a>(
     sys: &mut System,
     process_list_buf: &mut Option<ProcessListInfo>,
     process_refresh_kind: &Option<ProcessRefreshKind>,
     remove_dead_processes: bool,
+    sort_by: impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering,
+    process_limit: usize,
+    include_exporter_metrics: bool,
 ) {
-    if let (Some(buf), Some(refresh_kind)) 
-        = (process_list_buf, process_refresh_kind) 
+    if let (Some(buf), Some(refresh_kind))
+        = (process_list_buf, process_refresh_kind)
     {
         sys.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::All, 
-            remove_dead_processes, 
+            sysinfo::ProcessesToUpdate::All,
+            remove_dead_processes,
             *refresh_kind,
         );
+        buf.clear_dynamic();
+
+        update_process_list_info(sys, &mut buf.process_list);
+
+        buf.process_list.sort_unstable_by(sort_by);
+        buf.process_list.truncate(process_limit);
+
+        if include_exporter_metrics
+            && let(Ok(pid), Some(self_metrics)) =
+                (get_current_pid(), &mut buf.exporter_metrics)
+        {
+            self_metrics.clear_dynamic();
+            if let Some(process) = get_process_by_id(sys, pid) {
+                write_process_info(process, self_metrics);
+            }
+        }
     }
 }

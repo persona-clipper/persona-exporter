@@ -6,15 +6,15 @@ use core::time;
 use std::cmp::Ordering;
 use crate::platforms::os::methods::arguments::{GlobalContext, RequestBodyOptions};
 use crate::platforms::os::methods::{
-    build_request_body, collect_metrics_as_line_protocol, metrics, send_request,
+    build_request_body, collect_metrics_as_line_protocol, send_request,
 };
 
 use crate::platforms::os::methods::metrics::components::collect_components_metrics;
-use crate::platforms::os::methods::metrics::cpu::{collect_cpus_metrics, try_collect_cpu_metrics};
+use crate::platforms::os::methods::metrics::cpu::try_collect_cpu_metrics;
 use crate::platforms::os::methods::metrics::disk::collect_storage_list_metrics;
-use crate::platforms::os::methods::metrics::memory::{collect_memory_metrics, try_collect_memory_metrics};
+use crate::platforms::os::methods::metrics::memory::try_collect_memory_metrics;
 use crate::platforms::os::methods::metrics::network::collect_network_metrics;
-use crate::platforms::os::methods::metrics::system::{collect_system_metrics, try_collect_system_metrics};
+use crate::platforms::os::methods::metrics::system::try_collect_system_metrics;
 use persona_exporter_types::metrics::traits::Clear;
 use smol::stream::StreamExt;
 use std::time::{Duration, SystemTime};
@@ -85,6 +85,8 @@ pub async fn collect_metrics_for_os(
             //     system_buf.clear_dynamic();
             //     collect_system_metrics(system_buf);
             // }
+
+            // try_collect_process_list_metrics(sys, process_list_buf, process_refresh_kind, remove_dead_processes, sort_by, process_limit, include_exporter_metrics);
             if let (Some(process_list_buf), Some(refresh_kind)) = (
                 &mut global_context.buffers.metrics.process_list,
                 sys_context.refresh_kinds.process_refresh_kind,

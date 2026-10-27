@@ -34,7 +34,7 @@ impl AgentConfigFile {
     /// # Errors
     /// Raises an error if the configuration file fails to parse—for example, if an environment variable
     /// is not declared or there is a typo in a value or section.
-    pub fn new_with(override_config_path: Option<CompactString>) -> Result<Self, ConfigError> {
+    pub fn new(override_config_path: Option<CompactString>) -> Result<Self, ConfigError> {
         // let config_path: PathBuf = {
         //
         //     if let Some(override_path) = override_config_path {
