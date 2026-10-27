@@ -18,7 +18,9 @@ use ureq::config::Config;
 
 /// Since a trait signature cannot be used directly as a field type,
 /// it is necessary to use a generic type parameter `F` that implements
-/// that signature; consequently, any struct that includes a field of
+/// that signature;
+///
+/// consequently, any struct that includes a field of
 /// this generic type `F` must also specify the type `F`.
 pub struct GlobalContext<'a, F>
 where
@@ -126,6 +128,7 @@ pub struct CollectProcessListOptions {
 pub struct Buffers {
     pub metrics: ServerMetrics,
     pub line_protocol_buffer: Vec<u8>,
+    pub json_buffer: serde_json::Value,
 }
 
 pub struct MetricsSnapshots {
@@ -135,6 +138,11 @@ pub struct MetricsSnapshots {
     pub system_context: Option<SystemContext>,
 }
 
+
+#[allow(clippy::struct_excessive_bools)]
+/// # Why allow [`clippy::struct_excessive_bools`](https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#struct_excessive_bools)?
+/// Because the structure is not a state machine, but an abstraction
+/// over a configuration file section where multiple flags can be enabled.
 pub struct CommonConfigurations {
     pub memory_is_enabled: bool,
     pub system_is_enabled: bool,

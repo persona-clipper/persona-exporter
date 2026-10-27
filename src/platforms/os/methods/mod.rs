@@ -165,6 +165,8 @@ pub async fn send_request<T: AsSendBody>(request: ureq::RequestBuilder<WithBody>
     }
 }
 
+/// # Errors
+/// 
 pub fn load_config(
     override_config_path: Option<CompactString>,
 ) -> Result<AgentConfigFile, ConfigError> {

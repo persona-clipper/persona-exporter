@@ -1,5 +1,5 @@
 use compact_str::ToCompactString;
-use persona_exporter_types::metrics::structs::cpu::{CpuListInfo, CpuThreadInfo};
+use persona_exporter_types::metrics::{structs::cpu::{CpuListInfo, CpuThreadInfo}, traits::Clear};
 use sysinfo::System;
 
 pub fn collect_cpus_metrics(
@@ -18,4 +18,16 @@ pub fn collect_cpus_metrics(
             cpu_usage: c.cpu_usage(),
         });
     });
+}
+
+pub fn try_collect_cpu_metrics(
+    sys: &mut System,
+    cpu_buf: &mut Option<CpuListInfo>,
+    physical_core_count: usize,
+) {
+    if let Some(cpu) = cpu_buf {
+        sys.refresh_cpu_all();
+        cpu.clear_dynamic();
+        collect_cpus_metrics(sys, physical_core_count, cpu);
+    }
 }

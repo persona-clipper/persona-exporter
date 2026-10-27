@@ -1,6 +1,7 @@
 use compact_str::ToCompactString;
 use persona_exporter_types::metrics::structs::system::{LoadAverage, SystemInfo};
 use persona_exporter_types::DEFAULT_UNKNOWN_MESSAGE;
+use persona_exporter_types::metrics::traits::Clear;
 use sysinfo::System;
 
 pub fn collect_system_metrics(system_metrics_buffer: &mut SystemInfo) {
@@ -50,4 +51,13 @@ pub fn collect_system_metrics(system_metrics_buffer: &mut SystemInfo) {
     //     host_name: System::host_name().unwrap_or(DEFAULT_UNKNOWN_MESSAGE.to_string()),
     //     load_average: load_avg,
     // };
+}
+
+pub fn try_collect_system_metrics(
+    sys_buf: &mut Option<SystemInfo>,
+) {
+    if let Some(s_buf) = sys_buf {
+        s_buf.clear_dynamic();
+        collect_system_metrics(s_buf);
+    }
 }

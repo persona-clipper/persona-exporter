@@ -41,13 +41,13 @@ pub struct ProcessListConfig {
 }
 
 // Задел на будущее
-pub struct EnabledSortByProcessList {
-    pub cpu_usage: bool,
-    pub memory: bool,
-    pub virtual_memory: bool,
-    pub run_time: bool,
-    pub start_time: bool,
-}
+// pub struct EnabledSortByProcessList {
+//     pub cpu_usage: bool,
+//     pub memory: bool,
+//     pub virtual_memory: bool,
+//     pub run_time: bool,
+//     pub start_time: bool,
+// }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct MemoryConfig {

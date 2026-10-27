@@ -19,12 +19,21 @@ impl AgentConfigFile {
     pub fn match_config_path_by_os() -> PathBuf {
         if cfg!(target_os = "linux") {
             PathBuf::from("/etc/persona-exporter")
-        } else {
+        } else /* Windows */ {
             PathBuf::from(env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string()))
                 .join("PersonaMetrics")
                 .join("PersonaExporter")
         }
     }
+    /// Configuration initialization. It automatically creates the
+    /// necessary directories and files if they do not exist
+    ///
+    /// # Panics
+    /// Triggers a panic if the program cannot create directories or files, or write default values.
+    ///
+    /// # Errors
+    /// Raises an error if the configuration file fails to parse—for example, if an environment variable
+    /// is not declared or there is a typo in a value or section.
     pub fn new_with(override_config_path: Option<CompactString>) -> Result<Self, ConfigError> {
         // let config_path: PathBuf = {
         //

@@ -1,14 +1,17 @@
 use crate::config::ProcessSortBy;
-use persona_exporter_types::metrics::structs::processes::ProcessInfo;
+use persona_exporter_types::metrics::processes::ProcessListInfo;
+use persona_exporter_types::metrics::{structs::processes::ProcessInfo, system::SystemInfo};
 use persona_exporter_types::metrics::sysinfo::processes::FromWithNormalizeCpu;
 use std::cmp::Ordering;
-use sysinfo::{Pid, System};
+use std::process;
+use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
 
 #[must_use]
-pub fn get_process_by_id(sys: &System, pid: Pid) -> ProcessInfo {
-    let system_process = sys.process(pid).unwrap();
+pub fn get_process_by_id(sys: &System, pid: Pid) -> Option<ProcessInfo> {
+    sys.process(pid).map(|process| {
+        ProcessInfo::from_with_cpu(process, sys.cpus().len())
+    })
 
-    ProcessInfo::from_with_cpu(system_process, sys.cpus().len() as f32)
 }
 
 pub fn get_sort_closure(
@@ -58,7 +61,7 @@ pub fn update_process_list_info(
     // let mut local_process_list_buffer = take(&mut process_list_struct.process_list);
 
     sys.processes().values().for_each(|process| {
-        process_list_buffer.push(ProcessInfo::from_with_cpu(process, sys.cpus().len() as f32));
+        process_list_buffer.push(ProcessInfo::from_with_cpu(process, sys.cpus().len()));
     });
 
     // let self_process_metrics: Option<ProcessInfo> = get_current_pid()
@@ -85,4 +88,21 @@ pub fn update_process_list_info(
     //     exporter_metrics: self_process_metrics,
     //     process_list: local_process_list_buffer,
     // };
+}
+
+pub fn try_collect_process_list_metrics(
+    sys: &mut System,
+    process_list_buf: &mut Option<ProcessListInfo>,
+    process_refresh_kind: &Option<ProcessRefreshKind>,
+    remove_dead_processes: bool,
+) {
+    if let (Some(buf), Some(refresh_kind)) 
+        = (process_list_buf, process_refresh_kind) 
+    {
+        sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All, 
+            remove_dead_processes, 
+            *refresh_kind,
+        );
+    }
 }

@@ -1,30 +1,33 @@
 use crate::config::{AgentConfigFile, DataType};
 use crate::platforms::os::methods::metrics::processes::{
-    get_process_by_id, get_sort_closure, update_process_list_info, write_process_info,
+    get_process_by_id, update_process_list_info, write_process_info,
 };
 use core::time;
-
-use crate::platforms::os::methods::arguments::{
-    GlobalContext, RequestBodyOptions,
-};
+use std::cmp::Ordering;
+use crate::platforms::os::methods::arguments::{GlobalContext, RequestBodyOptions};
 use crate::platforms::os::methods::{
-    build_request_body, collect_metrics_as_line_protocol, create_metrics_struct_by_config,
-    send_request,
+    build_request_body, collect_metrics_as_line_protocol, metrics, send_request,
 };
 
 use crate::platforms::os::methods::metrics::components::collect_components_metrics;
-use crate::platforms::os::methods::metrics::cpu::collect_cpus_metrics;
+use crate::platforms::os::methods::metrics::cpu::{collect_cpus_metrics, try_collect_cpu_metrics};
 use crate::platforms::os::methods::metrics::disk::collect_storage_list_metrics;
-use crate::platforms::os::methods::metrics::memory::collect_memory_metrics;
+use crate::platforms::os::methods::metrics::memory::{collect_memory_metrics, try_collect_memory_metrics};
 use crate::platforms::os::methods::metrics::network::collect_network_metrics;
-use crate::platforms::os::methods::metrics::system::collect_system_metrics;
+use crate::platforms::os::methods::metrics::system::{collect_system_metrics, try_collect_system_metrics};
 use persona_exporter_types::metrics::traits::Clear;
 use smol::stream::StreamExt;
 use std::time::{Duration, SystemTime};
+use persona_exporter_types::metrics::structs::processes::ProcessInfo;
 use sysinfo::{get_current_pid, ProcessesToUpdate};
 use tracing::{debug, info};
+use persona_exporter_types::metrics::line_protocol::GlobalTags;
+use persona_exporter_types::metrics::server::ServerMetrics;
 
-pub async fn collect_metrics_for_os(config: AgentConfigFile) {
+pub async fn collect_metrics_for_os(
+    config: &AgentConfigFile,
+    global_context: &mut GlobalContext<'_, impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering>
+) {
     // TODO LIST:
     // Добавить массив url и send_interval - чтобы один экспортер мой слать метрики на разные url с разной переодичностью.
     // Как это будет выглядеть:
@@ -34,9 +37,6 @@ pub async fn collect_metrics_for_os(config: AgentConfigFile) {
     //        send_interval: 10s
     //        timeout: 30s
     // ...
-    let sort_by = get_sort_closure(&config.metrics.processes.sort_by);
-    let mut global_context =
-        GlobalContext::new(&config, sort_by, create_metrics_struct_by_config(&config));
 
     // Specific objects for the push model
     let additional_headers = &config.server.push.http_headers;
@@ -63,22 +63,28 @@ pub async fn collect_metrics_for_os(config: AgentConfigFile) {
         // Метрики требующий sysinfo::System
         if let Some(ref mut sys_context) = global_context.snapshots.system_context {
             let s = &mut sys_context.snapshot;
+            let metrics_buf = &mut global_context.buffers.metrics;
+
             // Здесь не нужна проверка, включена ли та или иная секция метрик в конфиге. Так как если выключена
             // То buffers.metrics.memory будет равнятся None. Такое поведение заложено ещё в инициализации структуры ServerMetrics
-            if let Some(ref mut mem_buf) = global_context.buffers.metrics.memory {
-                s.refresh_memory();
-                // mem_buf.clear_dynamic();
-                collect_memory_metrics(s, mem_buf);
-            }
-            if let Some(ref mut cpu_buf) = global_context.buffers.metrics.cpu {
-                s.refresh_cpu_all();
-                cpu_buf.clear_dynamic();
-                collect_cpus_metrics(s, global_context.variables.physical_core_count, cpu_buf);
-            }
-            if let Some(ref mut system_buf) = global_context.buffers.metrics.system {
-                system_buf.clear_dynamic();
-                collect_system_metrics(system_buf);
-            }
+            try_collect_memory_metrics(s, &mut metrics_buf.memory);
+            try_collect_cpu_metrics(s, &mut metrics_buf.cpu, global_context.variables.physical_core_count);
+            try_collect_system_metrics(&mut metrics_buf.system);
+
+            // if let Some(ref mut mem_buf) = global_context.buffers.metrics.memory {
+            //     s.refresh_memory();
+            //     // mem_buf.clear_dynamic();
+            //     collect_memory_metrics(s, mem_buf);
+            // }
+            // if let Some(ref mut cpu_buf) = global_context.buffers.metrics.cpu {
+            //     s.refresh_cpu_all();
+            //     cpu_buf.clear_dynamic();
+            //     collect_cpus_metrics(s, global_context.variables.physical_core_count, cpu_buf);
+            // }
+            // if let Some(ref mut system_buf) = global_context.buffers.metrics.system {
+            //     system_buf.clear_dynamic();
+            //     collect_system_metrics(system_buf);
+            // }
             if let (Some(process_list_buf), Some(refresh_kind)) = (
                 &mut global_context.buffers.metrics.process_list,
                 sys_context.refresh_kinds.process_refresh_kind,
@@ -109,7 +115,9 @@ pub async fn collect_metrics_for_os(config: AgentConfigFile) {
                 {
                     self_metrics.clear_dynamic();
                     let process = get_process_by_id(s, pid);
-                    write_process_info(process, self_metrics);
+                    if let Some(process) = process {
+                        write_process_info(process, self_metrics);
+                    }
                 }
             }
         }
@@ -139,13 +147,7 @@ pub async fn collect_metrics_for_os(config: AgentConfigFile) {
             collect_components_metrics(c, components_info);
         }
 
-        global_context.buffers.metrics.time = i64::try_from(
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos(),
-        )
-        .unwrap_or_default();
+        global_context.buffers.metrics.time = get_timestamp();
 
         let request = build_request_body(&request_options);
         match config.agent.data_type {
@@ -153,25 +155,48 @@ pub async fn collect_metrics_for_os(config: AgentConfigFile) {
                 let mut line_buffer =
                     std::mem::take(&mut global_context.buffers.line_protocol_buffer);
 
-                line_buffer.clear();
-                collect_metrics_as_line_protocol(
+                build_body_as_line_protocol(
                     &global_context.buffers.metrics,
                     &mut line_buffer,
-                    global_context.variables.global_tags,
+                    global_context.variables.global_tags
                 );
-
-                info!("Sending data to a specified URL",);
-                debug!("{:#?}", String::from_utf8(line_buffer.clone()));
-
                 send_request(request, &line_buffer).await;
             }
             DataType::Json => {
-                info!("Machine metrics: {:#?}", global_context.buffers.metrics);
+                build_body_as_json(&global_context.buffers.metrics, &mut global_context.buffers.json_buffer);
 
-                let json_body = serde_json::json!(global_context.buffers.metrics);
-
-                send_request(request, &json_body.to_string()).await;
+                send_request(request, &global_context.buffers.json_buffer.to_string()).await;
             }
         }
     }
+}
+
+pub fn build_body_as_json(
+    metrics: &ServerMetrics,
+    buffer: &mut serde_json::Value,
+) {
+    *buffer = serde_json::json!(metrics);
+    debug!("Machine metrics: {:#?}", buffer);
+}
+
+pub fn build_body_as_line_protocol(
+    metrics: &ServerMetrics,
+    buffer: &mut Vec<u8>,
+    global_tags: &GlobalTags
+) {
+    buffer.clear();
+    collect_metrics_as_line_protocol(
+        metrics, buffer, global_tags
+    );
+    debug!("{:#?}", String::from_utf8(buffer.clone()));
+}
+
+#[must_use]
+pub fn get_timestamp() -> i64 {
+    i64::try_from(
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos(),
+    ).unwrap_or_default()
 }

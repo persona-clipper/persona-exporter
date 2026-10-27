@@ -11,4 +11,15 @@ pub fn collect_memory_metrics(sys: &System, memory_buffer: &mut MemoryInfo) {
     memory_buffer.free_swap = sys.free_swap();
 }
 
+pub fn try_collect_memory_metrics(sys: &mut System, memory_buf: &mut Option<MemoryInfo>) {
+    if let Some(mem) = memory_buf {
+        sys.refresh_memory();
+        collect_memory_metrics(sys, mem);
+    }
+}
+
 pub const fn initial_memory_snapshot() {}
+
+pub fn write_memory_buffer() {
+
+}
