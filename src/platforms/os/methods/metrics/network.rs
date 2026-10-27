@@ -1,5 +1,6 @@
 use persona_exporter_types::metrics::structs::network::NetworkInfo;
 use persona_exporter_types::DEFAULT_UNKNOWN_MESSAGE;
+use persona_exporter_types::metrics::traits::Clear;
 use sysinfo::Networks;
 
 pub fn collect_network_metrics(networks: &mut Networks, network_info_buffer: &mut NetworkInfo) {
@@ -26,5 +27,16 @@ pub fn collect_network_metrics(networks: &mut Networks, network_info_buffer: &mu
         network_info_buffer
             .interface_name
             .push_str(DEFAULT_UNKNOWN_MESSAGE);
+    }
+}
+
+pub fn try_collect_network_metrics(
+    network_snapshot: &mut Option<Networks>,
+    buffer: &mut Option<NetworkInfo>,
+) {
+    if let (Some(n), Some(buf)) = (network_snapshot, buffer) {
+        n.refresh(false);
+        buf.clear_dynamic();
+        collect_network_metrics(n, buf);
     }
 }

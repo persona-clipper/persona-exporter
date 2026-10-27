@@ -1,6 +1,7 @@
 use compact_str::ToCompactString;
 use persona_exporter_types::metrics::structs::components::{ComponentInfo, ComponentListInfo};
 use persona_exporter_types::DEFAULT_UNKNOWN_MESSAGE;
+use persona_exporter_types::metrics::traits::Clear;
 use sysinfo::Components;
 
 pub fn collect_components_metrics(
@@ -24,5 +25,15 @@ pub fn collect_components_metrics(
     });
 }
 
+pub fn try_collect_components_metrics(
+    snapshot: &mut Option<Components>,
+    buffer: &mut Option<ComponentListInfo>,
+) {
+    if let (Some(c), Some(buf)) = (snapshot, buffer) {
+        c.refresh(false);
+        buf.clear_dynamic();
+        collect_components_metrics(c, buf);
+    }
+}
 
 

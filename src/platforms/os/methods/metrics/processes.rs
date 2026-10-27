@@ -4,14 +4,25 @@ use persona_exporter_types::metrics::traits::Clear;
 use persona_exporter_types::metrics::structs::processes::ProcessInfo;
 use persona_exporter_types::metrics::sysinfo::processes::FromWithNormalizeCpu;
 use std::cmp::Ordering;
-use sysinfo::{Pid, ProcessRefreshKind, System, get_current_pid};
+use sysinfo::{Pid, Process, ProcessRefreshKind, System, get_current_pid};
+
+pub struct TryCollectProcessesArgs<'a, F>
+where
+    F: Fn(&ProcessInfo, &ProcessInfo) -> Ordering + 'a
+{
+   pub include_exporter_metrics: bool,
+   pub sort_by: &'a F,
+   pub process_limit: usize,
+   pub remove_dead_processes: bool,
+   pub refresh_kind: &'a Option<ProcessRefreshKind>,
+}
+
 
 #[must_use]
 pub fn get_process_by_id(sys: &System, pid: Pid) -> Option<ProcessInfo> {
     sys.process(pid).map(|process| {
         ProcessInfo::from_with_cpu(process, sys.cpus().len())
     })
-
 }
 
 pub fn get_sort_closure(
@@ -97,28 +108,29 @@ pub fn update_process_list_info(
 pub fn try_collect_process_list_metrics<'a>(
     sys: &mut System,
     process_list_buf: &mut Option<ProcessListInfo>,
-    process_refresh_kind: &Option<ProcessRefreshKind>,
-    remove_dead_processes: bool,
-    sort_by: impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering,
-    process_limit: usize,
-    include_exporter_metrics: bool,
+    context: &TryCollectProcessesArgs<'a, impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering>,
+
+    // process_refresh_kind: &Option<ProcessRefreshKind>,
+    // remove_dead_processes: bool,
+    // sort_by: impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering,
+    // process_limit: usize,
+    // include_exporter_metrics: bool,
 ) {
-    if let (Some(buf), Some(refresh_kind))
-        = (process_list_buf, process_refresh_kind)
+    if let (Some(buf), Some(refresh_kind)) = (process_list_buf, context.refresh_kind)
     {
         sys.refresh_processes_specifics(
             sysinfo::ProcessesToUpdate::All,
-            remove_dead_processes,
+            context.remove_dead_processes,
             *refresh_kind,
         );
         buf.clear_dynamic();
 
         update_process_list_info(sys, &mut buf.process_list);
 
-        buf.process_list.sort_unstable_by(sort_by);
-        buf.process_list.truncate(process_limit);
+        buf.process_list.sort_unstable_by(context.sort_by);
+        buf.process_list.truncate(context.process_limit);
 
-        if include_exporter_metrics
+        if context.include_exporter_metrics
             && let(Ok(pid), Some(self_metrics)) =
                 (get_current_pid(), &mut buf.exporter_metrics)
         {
