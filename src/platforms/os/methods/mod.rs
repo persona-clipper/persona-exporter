@@ -170,7 +170,6 @@ pub async fn send_request<T: AsSendBody>(request: ureq::RequestBuilder<WithBody>
 //) -> Result<AgentConfigFile, ConfigError> {
 //   AgentConfigFile::new_with(override_config_path)
 //}
-
 pub fn initial_tracing(log_level: u8) {
     let level = match log_level {
         1 => Level::INFO,

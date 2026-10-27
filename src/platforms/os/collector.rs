@@ -60,18 +60,18 @@ pub async fn collect_metrics_for_os(
         sort_by: &global_context.variables.sort_by,
         process_limit: global_context.variables.process_limit,
         remove_dead_processes: config.metrics.processes.remove_dead_processes,
-        refresh_kind: &None,
+        refresh_kind: None,
     };
 
     // Main
     while interval.next().await.is_some() {
         info!("Next metrics created after {} seconds", await_seconds);
-
-        // Метрики требующий sysinfo::System
-        if let Some(ref mut sys_context) = global_context.snapshots.system_context {
+        
+        // Метрики требующиe [`sysinfo::System`]
+        if let Some(sys_context) = &mut global_context.snapshots.system_context {
             let s = &mut sys_context.snapshot;
             let metrics_buf = &mut global_context.buffers.metrics;
-            process_update_context.refresh_kind = &sys_context.refresh_kinds.process_refresh_kind;
+            process_update_context.refresh_kind = sys_context.refresh_kinds.process_refresh_kind;
 
             // Здесь не нужна проверка, включена ли та или иная секция метрик в конфиге. Так как если выключена
             // То buffers.metrics.memory будет равнятся None. Такое поведение заложено ещё в инициализации структуры ServerMetrics
@@ -94,7 +94,6 @@ pub async fn collect_metrics_for_os(
             //     collect_system_metrics(system_buf);
             // }
 
-            // ---------------------------------------------------------------------------------------------------------------------------------------------------------
             try_collect_process_list_metrics(
                 s,
                 &mut global_context.buffers.metrics.process_list,

@@ -14,7 +14,7 @@ where
    pub sort_by: &'a F,
    pub process_limit: usize,
    pub remove_dead_processes: bool,
-   pub refresh_kind: &'a Option<ProcessRefreshKind>,
+   pub refresh_kind: Option<ProcessRefreshKind>,
 }
 
 
@@ -121,7 +121,7 @@ pub fn try_collect_process_list_metrics<'a>(
         sys.refresh_processes_specifics(
             sysinfo::ProcessesToUpdate::All,
             context.remove_dead_processes,
-            *refresh_kind,
+            refresh_kind,
         );
         buf.clear_dynamic();
 
