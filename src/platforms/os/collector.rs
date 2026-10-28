@@ -1,6 +1,6 @@
 use crate::config::{AgentConfigFile, DataType};
 use crate::platforms::os::methods::metrics::processes::{
-    TryCollectProcessesArgs, get_process_by_id, try_collect_process_list_metrics, update_process_list_info, write_process_info,
+    TryCollectProcessesArgs, try_collect_process_list_metrics,
 };
 use core::time;
 use std::cmp::Ordering;
@@ -15,18 +15,16 @@ use crate::platforms::os::methods::metrics::disk::try_collect_disk_metrics;
 use crate::platforms::os::methods::metrics::memory::try_collect_memory_metrics;
 use crate::platforms::os::methods::metrics::network::try_collect_network_metrics;
 use crate::platforms::os::methods::metrics::system::try_collect_system_metrics;
-use persona_exporter_types::metrics::traits::Clear;
 use smol::stream::StreamExt;
 use std::time::{Duration, SystemTime};
 use persona_exporter_types::metrics::structs::processes::ProcessInfo;
-use sysinfo::{get_current_pid, ProcessesToUpdate};
 use tracing::{debug, info};
 use persona_exporter_types::metrics::line_protocol::GlobalTags;
 use persona_exporter_types::metrics::server::ServerMetrics;
 
 pub async fn collect_metrics_for_os(
     config: &AgentConfigFile,
-    global_context: &mut GlobalContext<'_, impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering>
+    global_context: &mut GlobalContext<'_, impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering + Send + Sync>
 ) {
     // TODO LIST:
     // Добавить массив url и send_interval - чтобы один экспортер мой слать метрики на разные url с разной переодичностью.
@@ -66,7 +64,7 @@ pub async fn collect_metrics_for_os(
     // Main
     while interval.next().await.is_some() {
         info!("Next metrics created after {} seconds", await_seconds);
-        
+
         // Метрики требующиe [`sysinfo::System`]
         if let Some(sys_context) = &mut global_context.snapshots.system_context {
             let s = &mut sys_context.snapshot;

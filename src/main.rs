@@ -53,7 +53,7 @@ fn main() {
     let sort_by = get_sort_closure(&config.metrics.processes.sort_by);
     let mut global_context =
         GlobalContext::new(&config, sort_by, create_metrics_struct_by_config(&config));
-
+    
     smol::block_on(async {
         match config.agent.send_model {
             SendModel::Push => {

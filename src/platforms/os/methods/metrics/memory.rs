@@ -20,6 +20,6 @@ pub fn try_collect_memory_metrics(sys: &mut System, memory_buf: &mut Option<Memo
 
 pub const fn initial_memory_snapshot() {}
 
-pub fn write_memory_buffer() {
+pub const fn write_memory_buffer() {
 
 }

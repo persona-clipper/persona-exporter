@@ -4,7 +4,7 @@ use persona_exporter_types::metrics::traits::Clear;
 use persona_exporter_types::metrics::structs::processes::ProcessInfo;
 use persona_exporter_types::metrics::sysinfo::processes::FromWithNormalizeCpu;
 use std::cmp::Ordering;
-use sysinfo::{Pid, Process, ProcessRefreshKind, System, get_current_pid};
+use sysinfo::{Pid, ProcessRefreshKind, System, get_current_pid};
 
 pub struct TryCollectProcessesArgs<'a, F>
 where
@@ -105,10 +105,10 @@ pub fn update_process_list_info(
 /// Optimize too many arguments in one function
 /// Solution:
 /// Move the arguments for this function into a separate structure
-pub fn try_collect_process_list_metrics<'a>(
+pub fn try_collect_process_list_metrics(
     sys: &mut System,
     process_list_buf: &mut Option<ProcessListInfo>,
-    context: &TryCollectProcessesArgs<'a, impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering>,
+    context: &TryCollectProcessesArgs<'_, impl Fn(&ProcessInfo, &ProcessInfo) -> Ordering>,
 
     // process_refresh_kind: &Option<ProcessRefreshKind>,
     // remove_dead_processes: bool,
